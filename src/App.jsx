@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Scale, 
   MoveUp, 
@@ -18,7 +18,11 @@ import {
   Cpu
 } from 'lucide-react';
 
-// --- Componentes Visuais ---
+// Importa os dois hooks (Mock e MQTT)
+import { useSimulation } from './hooks/useSimulation';
+import { useMqttData } from './hooks/useMqttData';
+
+// --- Componentes Visuais (Mantidos aqui conforme sua preferência) ---
 
 // Card Base
 const DashboardCard = ({ title, icon: Icon, children, accentColor = "border-amber-500" }) => (
@@ -49,7 +53,7 @@ const IconButton = ({ onClick, icon: Icon, label, color = "hover:bg-zinc-800", d
     className={`p-2 rounded-lg text-zinc-400 transition-colors ${color} ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:text-white'} flex items-center gap-2 text-xs font-bold uppercase`}
     title={label}
   >
-    <Icon size={16} />
+    {Icon && <Icon size={16} />}
     <span>{label}</span>
   </button>
 );
@@ -81,71 +85,82 @@ const ProgressBar = ({ value, max, color = "bg-amber-500", label }) => (
   </div>
 );
 
-// --- Aplicação ---
+// --- Aplicação Principal ---
 
-export default function ApiSSenseV2() {
+export default function ApiSSense() {
   // --- Estados do Sistema ---
   const [system, setSystem] = useState({
-    battery: 87,
+    battery: 100,
     isCharging: false,
-    sd1: { used: 4.2, total: 32 }, // GB
-    sd2: { used: 12.8, total: 32 }, // GB
+    sd1: { used: 4.2, total: 32 }, 
+    sd2: { used: 12.8, total: 32 }, 
   });
 
   // --- Estados dos Sensores ---
-  const [scale, setScale] = useState({ raw: 24.500, tare: 0, isCalibrating: false });
+  const [scale, setScale] = useState({ raw: 1.500, tare: 0, isCalibrating: false });
   const [flow, setFlow] = useState({ in: 450, out: 412 });
-  
-  // Sensor Interno (CO2 + Temp + Hum)
   const [internalEnv, setInternalEnv] = useState({ co2: 650, temp: 34.2, hum: 60 });
-  
-  // Sensor Externo (Temp + Hum)
   const [externalEnv, setExternalEnv] = useState({ temp: 28.5, hum: 45 });
+  const [voc, setVoc] = useState({ value: 150, risk: 'Baixo' });
 
-  // Sensor VOC (Gases Voláteis)
-  const [voc, setVoc] = useState({ value: 150, risk: 'Baixo' }); // Index 0-500
+  // 1. CONFIGURAÇÃO CENTRAL DE DADOS
+  // Mude para 'false' para ativar o MQTT real e desligar a simulação
+  const USE_MOCK = false; 
 
-  // Simulação de Dados
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Simulação aleatória para dar vida ao dashboard
-      setInternalEnv(prev => ({
-        co2: prev.co2 + (Math.random() - 0.5) * 10,
-        temp: prev.temp + (Math.random() - 0.5) * 0.1,
-        hum: prev.hum + (Math.random() - 0.5) * 0.5
-      }));
-      
-      setVoc(prev => ({
-        value: Math.max(0, Math.min(500, prev.value + (Math.random() - 0.5) * 5)),
-        risk: prev.value > 300 ? 'Alto' : prev.value > 100 ? 'Médio' : 'Baixo'
-      }));
+  // Agrupamos todos os setters para facilitar o envio para os hooks
+  const allSetters = {
+    setSystem,
+    setScale,
+    setFlow,
+    setInternalEnv,
+    setExternalEnv,
+    setVoc
+  };
 
-      // Flutuação de peso
-      setScale(prev => ({ ...prev, raw: prev.raw + (Math.random() - 0.5) * 0.002 }));
-      
-      // Bateria descarregando lentamente
-      if (Math.random() > 0.95) setSystem(prev => ({ ...prev, battery: Math.max(0, prev.battery - 0.1) }));
+  // 2. CHAMADA DOS HOOKS (Lógica "Ou um Ou Outro")
+  
+  // Hook de Simulação (só roda se USE_MOCK for true)
+  useSimulation(USE_MOCK, allSetters);
 
-    }, 1500);
-    return () => clearInterval(interval);
-  }, []);
+  // Hook de MQTT (só roda se USE_MOCK for false)
+  // Desestruturamos o 'publishCommand' que ele retorna
+  const { publishCommand } = useMqttData(!USE_MOCK, allSetters);
 
-  // Handlers
-  const handleTare = () => setScale(prev => ({ ...prev, tare: prev.raw }));
-  const handleResetFlow = () => setFlow({ in: 0, out: 0 });
+  // --- HANDLERS (Comandos dos Botões) ---
+
+  const handleTare = () => {
+    if (USE_MOCK) {
+      // Comportamento local na simulação
+      setScale(prev => ({ ...prev, tare: prev.raw }));
+    } else {
+      // Envia comando via MQTT para o ESP32
+      publishCommand('apissense/loadcell1/cmd', 'TARE');
+    }
+  };
+
+  const handleResetFlow = () => {
+    if (USE_MOCK) {
+       setFlow({ in: 0, out: 0 });
+    } else {
+       // Envia comando via MQTT para o ESP32
+       publishCommand('apissense/beecount/cmd', 'RESET');
+    }
+  };
   
   const handleCalibrate = () => {
+    // Calibração geralmente é um processo complexo. 
+    // Por enquanto, mantemos apenas o feedback visual local.
     setScale(prev => ({ ...prev, isCalibrating: true }));
     setTimeout(() => {
-      alert("Modo de Calibração Iniciado: Remova todo peso da balança.");
+      alert("Modo de Calibração: Implementar lógica de comando MQTT aqui se necessário.");
       setScale(prev => ({ ...prev, isCalibrating: false }));
     }, 1000);
   };
 
+  // Cálculos de renderização
   const currentWeight = Math.max(0, scale.raw - scale.tare).toFixed(3);
   const netFlow = flow.in - flow.out;
 
-  // Helper para cor da bateria
   const getBatteryColor = (level) => {
     if (level > 50) return "text-green-500";
     if (level > 20) return "text-amber-500";
@@ -179,7 +194,8 @@ export default function ApiSSenseV2() {
              <div className="h-8 w-px bg-zinc-800 mx-2"></div>
              <div className="flex flex-col text-xs text-zinc-500">
                <span className="uppercase font-bold text-zinc-400">Bateria Atual</span>
-               <span>Uptime: 14d 03h</span>
+               {/* Você pode pegar o Uptime do MQTT também se quiser no futuro */}
+               <span>Uptime: --</span>
              </div>
            </div>
         </div>
@@ -238,7 +254,7 @@ export default function ApiSSenseV2() {
           </div>
         </DashboardCard>
 
-        {/* 3. ATMOSFERA INTERNA (Sensor Multiplo) */}
+        {/* 3. ATMOSFERA INTERNA */}
         <DashboardCard title="Atmosfera da Colmeia" icon={Wind} accentColor="border-green-500">
           <div className="grid grid-cols-2 gap-4 h-full">
             <div className="col-span-2">
@@ -254,7 +270,7 @@ export default function ApiSSenseV2() {
           </div>
         </DashboardCard>
 
-        {/* 4. GASES VOLÁTEIS (Sensor VOC) */}
+        {/* 4. VOC */}
         <DashboardCard title="Gases Voláteis (VOCs)" icon={Zap} accentColor="border-purple-500">
           <div className="flex flex-col h-full justify-between gap-4">
              <div className="flex items-center justify-between">
@@ -285,20 +301,14 @@ export default function ApiSSenseV2() {
           </div>
         </DashboardCard>
 
-        {/* 6. ARMAZENAMENTO (SD Cards) */}
+        {/* 6. ARMAZENAMENTO */}
         <DashboardCard title="Armazenamento Local" icon={HardDrive} accentColor="border-zinc-500">
            <div className="space-y-4">
              <ProgressBar 
-                value={system.sd1.used} 
-                max={system.sd1.total} 
-                label={`SD Card 01 (Logs) (${system.sd1.used}GB / ${system.sd1.total}GB)`} 
-                color="bg-indigo-500" 
+               value={system.sd1.used} max={system.sd1.total} label={`SD Card 01 (Logs)`} color="bg-indigo-500" 
              />
              <ProgressBar 
-                value={system.sd2.used} 
-                max={system.sd2.total} 
-                label={`SD Card 02 (Audios) (${system.sd2.used}GB / ${system.sd2.total}GB)`} 
-                color="bg-cyan-500" 
+               value={system.sd2.used} max={system.sd2.total} label={`SD Card 02 (Audios)`} color="bg-cyan-500" 
              />
              <div className="flex justify-end pt-2">
                 <div className="text-[10px] text-green-500 flex items-center gap-1 uppercase font-bold bg-green-500/10 px-2 py-1 rounded">
