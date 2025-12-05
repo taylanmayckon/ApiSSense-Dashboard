@@ -30,13 +30,13 @@ export function useMqttData(enabled, setters) {
       return;
     }
 
-    const MQTT_URL = 'wss://broker.hivemq.com:8884/mqtt'; 
+    const MQTT_URL = 'ws://localhost:8888';
     const TOPIC_WILDCARD = 'apissense/#'; 
 
     console.log("📡 Iniciando conexão MQTT (Modo JSON Unificado)...");
 
     const client = mqtt.connect(MQTT_URL, {
-      clientId: `apissense_web_${Math.random().toString(16).slice(2)}`,
+      clientId: `apissense_dashboard`,
       clean: true,
       connectTimeout: 4000,
     });

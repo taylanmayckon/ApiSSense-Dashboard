@@ -11,10 +11,15 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.17",
+    "aedes": "^0.51.3",
+    "http": "^0.0.1-security",
     "lucide-react": "^0.556.0",
     "mqtt": "^5.14.1",
+    "net": "^1.0.2",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "vite-plugin-node-polyfills": "^0.24.0",
+    "websocket-stream": "^5.5.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
