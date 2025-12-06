@@ -118,9 +118,24 @@ export function useMqttData(enabled, setters) {
         }
 
         // GASES VOLÁTEIS
-        // Esperado: valor numerico "150"
-        case 'apissense/vocs': {
-          const newVal = parseFloat(payloadStr);
+        case 'apissense/voc': {
+          const data = parseJSON();
+          let newVal;
+          if (typeof data === 'object' && data.index !== undefined) {
+             newVal = data.index;
+          } 
+          // Se 'data' for apenas um número direto (ex: 150), usa ele mesmo
+          else if (typeof data === 'number') {
+             newVal = data;
+          } 
+          // Se veio string numérica ("150"), converte
+          else if (!isNaN(parseFloat(data))) {
+             newVal = parseFloat(data);
+          }
+          else {
+             console.warn("Formato VOC desconhecido:", data);
+             break;
+          }
           const newRisk = newVal > 300 ? 'Alto' : newVal > 100 ? 'Médio' : 'Baixo';
           setVoc(prev => ({
             ...prev,
