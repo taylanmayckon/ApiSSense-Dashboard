@@ -99,7 +99,10 @@ export default function ApiSSense() {
   // --- Estados dos Sensores ---
   const [scale, setScale] = useState({ raw: 1.500, tare: 0, isCalibrating: false });
   const [flow, setFlow] = useState({ in: 450, out: 412 });
-  const [internalEnv, setInternalEnv] = useState({ co2: 650, temp: 34.2, hum: 60 });
+  
+  // MUDANÇA: Renomeado de 'internalEnv' para 'scd41' para clareza
+  const [scd41, setScd41] = useState({ co2: 650, temp: 34.2, hum: 60 });
+  
   const [externalEnv, setExternalEnv] = useState({ temp: 28.5, hum: 45 });
   const [voc, setVoc] = useState({ value: 150, risk: 'Baixo' });
 
@@ -107,12 +110,12 @@ export default function ApiSSense() {
   // Mude para 'false' para ativar o MQTT real e desligar a simulação
   const USE_MOCK = false; 
 
-  // Agrupamos todos os setters para facilitar o envio para os hooks
+  // MUDANÇA: Atualizar o setter para 'setScd41'
   const allSetters = {
     setSystem,
     setScale,
     setFlow,
-    setInternalEnv,
+    setScd41,  // ← MUDANÇA AQUI
     setExternalEnv,
     setVoc
   };
@@ -123,17 +126,14 @@ export default function ApiSSense() {
   useSimulation(USE_MOCK, allSetters);
 
   // Hook de MQTT (só roda se USE_MOCK for false)
-  // Desestruturamos o 'publishCommand' que ele retorna
   const { publishCommand } = useMqttData(!USE_MOCK, allSetters);
 
   // --- HANDLERS (Comandos dos Botões) ---
 
   const handleTare = () => {
     if (USE_MOCK) {
-      // Comportamento local na simulação
       setScale(prev => ({ ...prev, tare: prev.raw }));
     } else {
-      // Envia comando via MQTT para o ESP32
       publishCommand('apissense/loadcell1/cmd', 'TARE');
     }
   };
@@ -142,14 +142,11 @@ export default function ApiSSense() {
     if (USE_MOCK) {
        setFlow({ in: 0, out: 0 });
     } else {
-       // Envia comando via MQTT para o ESP32
        publishCommand('apissense/beecount/cmd', 'RESET');
     }
   };
   
   const handleCalibrate = () => {
-    // Calibração geralmente é um processo complexo. 
-    // Por enquanto, mantemos apenas o feedback visual local.
     setScale(prev => ({ ...prev, isCalibrating: true }));
     setTimeout(() => {
       alert("Modo de Calibração: Implementar lógica de comando MQTT aqui se necessário.");
@@ -194,7 +191,6 @@ export default function ApiSSense() {
              <div className="h-8 w-px bg-zinc-800 mx-2"></div>
              <div className="flex flex-col text-xs text-zinc-500">
                <span className="uppercase font-bold text-zinc-400">Bateria Atual</span>
-               {/* Você pode pegar o Uptime do MQTT também se quiser no futuro */}
                <span>Uptime: --</span>
              </div>
            </div>
@@ -254,18 +250,18 @@ export default function ApiSSense() {
           </div>
         </DashboardCard>
 
-        {/* 3. ATMOSFERA INTERNA */}
-        <DashboardCard title="Atmosfera da Colmeia" icon={Wind} accentColor="border-green-500">
+        {/* 3. ATMOSFERA INTERNA - SCD41 */}
+        <DashboardCard title="SCD41 - Atmosfera Interna" icon={Wind} accentColor="border-green-500">
           <div className="grid grid-cols-2 gap-4 h-full">
             <div className="col-span-2">
-               <ValueDisplay value={internalEnv.co2.toFixed(0)} unit="ppm" label="Nível de CO2" color="text-green-400" />
-               <ProgressBar value={internalEnv.co2} max={2000} color="bg-green-500" label="" />
+               <ValueDisplay value={scd41.co2.toFixed(0)} unit="ppm" label="Nível de CO2" color="text-green-400" />
+               <ProgressBar value={scd41.co2} max={2000} color="bg-green-500" label="" />
             </div>
             <div>
-               <ValueDisplay value={internalEnv.temp.toFixed(1)} unit="°C" label="Temp. Interna" size="text-xl" />
+               <ValueDisplay value={scd41.temp.toFixed(1)} unit="°C" label="Temp. Interna" size="text-xl" />
             </div>
             <div>
-               <ValueDisplay value={internalEnv.hum.toFixed(0)} unit="%" label="Umid. Interna" size="text-xl" />
+               <ValueDisplay value={scd41.hum.toFixed(0)} unit="%" label="Umid. Interna" size="text-xl" />
             </div>
           </div>
         </DashboardCard>
@@ -286,8 +282,8 @@ export default function ApiSSense() {
           </div>
         </DashboardCard>
 
-        {/* 5. CLIMA EXTERNO */}
-        <DashboardCard title="Sensirion SHT31-D" icon={Thermometer} accentColor="border-orange-500">
+        {/* 5. CLIMA EXTERNO - SHT31 */}
+        <DashboardCard title="DHT22 - Clima Externo" icon={Thermometer} accentColor="border-orange-500">
           <div className="flex items-center justify-around h-full">
              <div className="text-center">
                 <Thermometer size={24} className="text-orange-500 mx-auto mb-2" />
