@@ -99,12 +99,11 @@ export function useMqttData(enabled, setters) {
           const data = parseJSON();
           if (!data) break;
           // Comentado até o sensor estar funcionando
-          // setScale(prev => ({
-          //   ...prev,
-          //   raw: data.weight !== undefined ? data.weight / 1000 : prev.raw,
-          //   tare: data.tare !== undefined ? data.tare : prev.tare
-          // }));
-          console.log('ℹ️ Loadcell recebida (ignorada - sensor não habilitado):', data);
+          setScale(prev => ({
+            ...prev,
+            raw: data.weight !== undefined ? data.weight / 1000 : prev.raw
+          }));
+          console.log('✅ Peso atualizado:', data);
           break;
         }
 

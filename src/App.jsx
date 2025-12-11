@@ -155,8 +155,10 @@ export default function ApiSSense() {
   };
 
   // Cálculos de renderização
+  // TODO: Implementar "Tara Remota"
+  scale.tare = 0.0;
   const currentWeight = Math.max(0, scale.raw - scale.tare).toFixed(3);
-  const netFlow = flow.in - flow.out;
+  const netFlow = flow.in - flow.out; 
 
   const getBatteryColor = (level) => {
     if (level > 50) return "text-green-500";
@@ -205,7 +207,7 @@ export default function ApiSSense() {
           <div className="space-y-4">
             <div className="flex justify-between items-end">
               <ValueDisplay value={currentWeight} unit="kg" label="Peso Líquido" color="text-amber-400" size="text-4xl" />
-              <ValueDisplay value={scale.raw.toFixed(3)} unit="kg" label="Peso Bruto" size="text-sm" color="text-zinc-500" />
+              <ValueDisplay value={(scale.raw+scale.tare).toFixed(3)} unit="kg" label="Peso Bruto" size="text-sm" color="text-zinc-500" />
             </div>
             
             <div className="pt-4 border-t border-zinc-800 flex gap-2">
